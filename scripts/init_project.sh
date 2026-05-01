@@ -26,16 +26,12 @@ prompt_nonempty() {
   printf -v "$__var_name" '%s' "$__value"
 }
 
-prompt_yes_no() {
+prompt_optional() {
   local __var_name="$1"
   local __msg="$2"
   local __value=""
   read -r -p "$__msg" __value || true
-  __value="$(printf '%s' "$__value" | tr '[:upper:]' '[:lower:]')"
-  case "$__value" in
-    y|yes) printf -v "$__var_name" 'yes' ;;
-    *)     printf -v "$__var_name" 'no' ;;
-  esac
+  printf -v "$__var_name" '%s' "$__value"
 }
 
 is_valid_project_name() {
@@ -58,17 +54,36 @@ write_file_if_missing() {
   printf '%s\n' "$content" > "$path"
 }
 
+normalize_installation_list() {
+  local raw="$1"
+  local normalized=""
+  local item=""
+
+  # Accept comma and/or whitespace separated package names.
+  raw="${raw//,/ }"
+  for item in $raw; do
+    if [[ -z "$normalized" ]]; then
+      normalized="$item"
+    else
+      normalized="${normalized} ${item}"
+    fi
+  done
+
+  printf '%s' "$normalized"
+}
+
 main() {
   require_cmd uv
+  require_cmd rsync
 
-  local script_dir repo_root parent_dir current_dir_name target_dir_name target_root
+  local script_dir repo_root parent_dir target_root
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
   repo_root="$(cd "${script_dir}/.." && pwd -P)"
 
   cd "$repo_root"
-  info "Repo root: $repo_root"
+  info "Template root: $repo_root"
 
-  local project_name python_version install_defaults
+  local project_name python_version installations install_packages
 
   while true; do
     prompt_nonempty project_name "New project name (letters/digits/_/- only): "
@@ -86,26 +101,34 @@ main() {
     warn "Invalid version. Examples: 3.13 or 3.13.1"
   done
 
-  prompt_yes_no install_defaults "Install default libraries (pydantic, jupyterlab)? [y/N]: "
+  prompt_optional installations "Install packages (comma or space separated, leave empty to skip): "
+  install_packages="$(normalize_installation_list "$installations")"
 
-  current_dir_name="$(basename "$repo_root")"
-  target_dir_name="$project_name"
   parent_dir="$(dirname "$repo_root")"
-  target_root="${parent_dir}/${target_dir_name}"
+  target_root="${parent_dir}/${project_name}"
 
-  if [[ "$current_dir_name" != "$target_dir_name" ]]; then
-    [[ -e "$target_root" ]] && die "Target directory already exists: $target_root"
-    info "Renaming project folder:"
-    info "  $repo_root"
-    info "→ $target_root"
-    mv "$repo_root" "$target_root"
+  [[ -e "$target_root" ]] && die "Target directory already exists: $target_root"
 
-    repo_root="$target_root"
-    cd "$repo_root"
-    info "Now in: $repo_root"
-  else
-    info "Folder name already matches project name; no rename needed."
-  fi
+  info "Creating new project directory from template:"
+  info "  $repo_root"
+  info "→ $target_root"
+  mkdir -p "$target_root"
+
+  # Copy template contents into the new project, excluding local/runtime artifacts.
+  rsync -a \
+    --exclude ".git/" \
+    --exclude ".venv/" \
+    --exclude "__pycache__/" \
+    --exclude ".pytest_cache/" \
+    --exclude ".mypy_cache/" \
+    --exclude ".ruff_cache/" \
+    --exclude ".ipynb_checkpoints/" \
+    --exclude "*.pyc" \
+    --exclude ".DS_Store" \
+    "${repo_root}/" "${target_root}/"
+
+  cd "$target_root"
+  info "Now in new project: $target_root"
 
   # Ensure minimal src packages exist for notebook imports.
   mkdir -p "src/config" "src/utils"
@@ -158,14 +181,15 @@ EOF
   info "Creating virtual environment with uv."
   uv venv --python "$python_version"
 
-  if [[ "$install_defaults" == "yes" ]]; then
-    info "Adding default dependencies: pydantic, jupyterlab"
-    uv add pydantic jupyterlab
+  if [[ -n "$install_packages" ]]; then
+    info "Adding dependencies: $install_packages"
+    # shellcheck disable=SC2086
+    uv add $install_packages
   else
-    info "Skipping default dependencies."
+    info "Skipping dependency installation."
   fi
 
-  info "Locking and syncing environment (uv.lock will be gitignored)."
+  info "Locking and syncing environment."
   uv lock
   uv sync
 
