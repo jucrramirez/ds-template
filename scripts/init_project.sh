@@ -12,7 +12,7 @@ trap 'on_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
 
 info() { printf '%s\n' "INFO: $*"; }
 warn() { printf '%s\n' "WARN: $*" >&2; }
-die() { printf '%s\n' "ERROR: $*" >&2; exit 1; }
+die()  { printf '%s\n' "ERROR: $*" >&2; exit 1; }
 
 require_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
 
@@ -101,7 +101,29 @@ main() {
     warn "Invalid version. Examples: 3.13 or 3.13.1"
   done
 
-  prompt_optional installations "Install packages (comma or space separated, leave empty to skip): "
+  # Module selection
+  printf '\nSelect modules to include in the project:\n'
+  printf '  1) LLM (includes generic pipelines and provider clients)\n'
+  printf '  2) Logger (custom logging setup)\n'
+  printf '  3) Serializer (CSV, parquet helpers, etc)\n'
+  
+  local module_input
+  prompt_optional module_input "Enter module numbers to include (e.g. 1 2 3, leave empty for none): "
+  
+  local include_llm=false
+  local include_logger=false
+  local include_serializer=false
+  
+  for num in $module_input; do
+    case "$num" in
+      1) include_llm=true ;;
+      2) include_logger=true ;;
+      3) include_serializer=true ;;
+      *) warn "Unknown module number: $num — skipping." ;;
+    esac
+  done
+
+  prompt_optional installations "Install extra packages (comma or space separated, leave empty to skip): "
   install_packages="$(normalize_installation_list "$installations")"
 
   parent_dir="$(dirname "$repo_root")"
@@ -111,7 +133,7 @@ main() {
 
   info "Creating new project directory from template:"
   info "  $repo_root"
-  info "→ $target_root"
+  info "-> $target_root"
   mkdir -p "$target_root"
 
   # Copy template contents into the new project, excluding local/runtime artifacts.
@@ -130,38 +152,49 @@ main() {
   cd "$target_root"
   info "Now in new project: $target_root"
 
-  # Ensure minimal src packages exist for notebook imports.
+  # Remove unselected modules
+  if [[ "$include_llm" == false ]]; then
+    rm -rf "src/llm"
+  fi
+  if [[ "$include_logger" == false ]]; then
+    rm -rf "src/logger"
+  fi
+  if [[ "$include_serializer" == false ]]; then
+    rm -rf "src/serializer"
+  fi
+
+  # Ensure core src packages exist for notebook imports.
   mkdir -p "src/config" "src/utils"
   write_file_if_missing "src/config/__init__.py" '"""Configuration package (YAML loader + settings models)."""'
-  write_file_if_missing "src/utils/__init__.py" '"""Utility package (notebook bootstrap, helpers, etc.)."""'
+  write_file_if_missing "src/utils/__init__.py"  '"""Utility package (notebook bootstrap, helpers, etc.)."""'
 
   # Ensure key directories exist + placeholders for git.
   mkdir -p "notebooks/pipeline" "notebooks/validation" "files/datasets" "files/tmp" "files/exports"
-  write_file_if_missing "notebooks/pipeline/.gitkeep" "placeholder"
+  write_file_if_missing "notebooks/pipeline/.gitkeep"   "placeholder"
   write_file_if_missing "notebooks/validation/.gitkeep" "placeholder"
-  write_file_if_missing "files/datasets/.gitkeep" "placeholder"
-  write_file_if_missing "files/tmp/.gitkeep" "placeholder"
-  write_file_if_missing "files/exports/.gitkeep" "placeholder"
+  write_file_if_missing "files/datasets/.gitkeep"       "placeholder"
+  write_file_if_missing "files/tmp/.gitkeep"            "placeholder"
+  write_file_if_missing "files/exports/.gitkeep"        "placeholder"
 
   # Ensure README exists (pyproject references it).
   if [[ ! -f "README.md" ]]; then
-    cat > "README.md" <<EOF
-## ${project_name}
-
-Initialized with uv. See \`scripts/init_project.sh\` for bootstrap behavior.
-EOF
+    printf '## %s\n\nInitialized with uv. See `scripts/init_project.sh` for bootstrap behavior.\n' \
+      "$project_name" > "README.md"
   fi
 
   if [[ -f "pyproject.toml" ]]; then
     die "pyproject.toml already exists. Refusing to overwrite."
   fi
 
-  info "Writing pyproject.toml (Hatchling + explicit src packages for notebook imports)."
-  cat > "pyproject.toml" <<EOF
-[build-system]
-requires = ["hatchling>=1.25.0"]
-build-backend = "hatchling.build"
+  info "Writing pyproject.toml"
 
+  # Build the packages array
+  local packages_array='"src/config", "src/utils"'
+  [[ "$include_llm" == true ]] && packages_array+=', "src/llm"'
+  [[ "$include_logger" == true ]] && packages_array+=', "src/logger"'
+  [[ "$include_serializer" == true ]] && packages_array+=', "src/serializer"'
+
+  cat > "pyproject.toml" << PYPROJECT
 [project]
 name = "${project_name}"
 version = "0.1.0"
@@ -170,9 +203,29 @@ readme = "README.md"
 requires-python = ">=${python_version}"
 dependencies = []
 
+PYPROJECT
+
+  # Optional dependencies for LLM providers
+  if [[ "$include_llm" == true ]]; then
+    cat >> "pyproject.toml" << PYPROJECT
+[project.optional-dependencies]
+aws = ["langchain-aws>=0.1.0", "boto3>=1.34.0"]
+gemini = ["langchain-google-genai>=1.0.0"]
+openai = ["langchain-openai>=0.1.0"]
+azure = ["langchain-openai>=0.1.0"]
+ollama = ["langchain-ollama>=0.1.0"]
+
+PYPROJECT
+  fi
+
+  cat >> "pyproject.toml" << PYPROJECT
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/config", "src/utils"]
-EOF
+packages = [${packages_array}]
+PYPROJECT
 
   if [[ -d ".venv" ]]; then
     die ".venv already exists. Refusing to overwrite."
@@ -181,12 +234,24 @@ EOF
   info "Creating virtual environment with uv."
   uv venv --python "$python_version"
 
+  # Always install core dependencies.
+  local core_deps="pydantic python-dotenv tqdm"
+  [[ "$include_llm" == true ]] && core_deps="${core_deps} langchain-core"
+  
+  info "Adding core dependencies: $core_deps"
+  # shellcheck disable=SC2086
+  uv add $core_deps
+
+  # We no longer prompt to immediately install the provider deps here 
+  # since we added them to [project.optional-dependencies]
+  if [[ "$include_llm" == true ]]; then
+    info "LLM module included. Optional provider dependencies (aws, gemini, openai, azure, ollama) can be installed via uv sync --extra <provider>"
+  fi
+
   if [[ -n "$install_packages" ]]; then
-    info "Adding dependencies: $install_packages"
+    info "Adding extra dependencies: $install_packages"
     # shellcheck disable=SC2086
     uv add $install_packages
-  else
-    info "Skipping dependency installation."
   fi
 
   info "Locking and syncing environment."
@@ -197,7 +262,13 @@ EOF
   printf '\nNext steps:\n' >&2
   [[ -f ".env.example" ]] && printf '  - Copy env:   cp .env.example .env  # then fill values\n' >&2
   printf '  - Activate:   source .venv/bin/activate\n' >&2
+  if [[ "$include_llm" == true ]]; then
+    printf '  - Providers:  uv sync --extra aws (or gemini, openai, azure, ollama)\n' >&2
+  fi
   printf '  - Jupyter:    jupyter lab\n\n' >&2
+  
+  printf 'Project successfully created at:\n' >&2
+  printf '\033[1;32m%s\033[0m\n\n' "$target_root" >&2
 }
 
 main "$@"

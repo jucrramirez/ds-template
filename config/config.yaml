@@ -3,43 +3,9 @@
 # This file is the single source of truth for pipeline behavior.
 # It should be validated/loaded by a config loader under `src/config/`.
 #
-# Replace the example schema/table/column values with your project’s domain.
 # Keep the overall *shape* stable so notebooks stay thin and reusable logic
 # reads settings from here instead of hardcoding.
 # -----------------------------------------------------------------------------
-
-database:
-  # Multi-schema database layout. Add/remove schemas and tables as needed.
-  schemas:
-    default:
-      tables:
-        items:
-          columns:
-            - "id"
-            - "title"
-            - "body"
-
-  # How row-level tables are aggregated into a per-entity document.
-  aggregation:
-    group_by: "id"
-    text_columns:
-      # Key must match a table name above.
-      # Value can be a single column (string) or list of columns.
-      items: "body"
-
-  # Optional: logical column -> human label mapping for document formatting.
-  column_mapping:
-    id: "ID"
-    title: "Title"
-    body: "Body"
-
-aws:
-  # AWS region used for Bedrock runtime calls.
-  region: "eu-west-1"
-  bedrock:
-    # Model ids / inference profile ids (pick ones available in your region).
-    llm_model: "eu.anthropic.claude-3-haiku-20240307-v1:0"
-    embedding_model: "cohere.embed-v4:0"
 
 storage:
   # Relative paths resolved from the project root (where config/ lives).
@@ -54,7 +20,7 @@ batch:
   save_frequency: 100
 
 llm:
-  # LLM call behavior (temperature 0 = deterministic).
+  # Generic LLM call behavior (temperature 0 = deterministic).
   temperature: 0
   max_tokens: 1000
   max_concurrency: 5
