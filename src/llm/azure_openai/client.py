@@ -6,7 +6,7 @@ Provides a reusable interface for Azure OpenAI embeddings and LLM calls.
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from pydantic import BaseModel
 
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

@@ -11,7 +11,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from llm.protocols import LLMClientProvider
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

@@ -6,7 +6,7 @@ Provides a reusable interface for OpenAI embeddings and LLM calls.
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import BaseModel
 
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

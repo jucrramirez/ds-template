@@ -157,10 +157,10 @@ main() {
     rm -rf "src/llm"
   fi
   if [[ "$include_logger" == false ]]; then
-    rm -rf "src/logger"
+    rm -rf "src/utils/logger"
   fi
   if [[ "$include_serializer" == false ]]; then
-    rm -rf "src/serializer"
+    rm -rf "src/utils/serializer"
   fi
 
   # Ensure core src packages exist for notebook imports.
@@ -191,8 +191,6 @@ main() {
   # Build the packages array
   local packages_array='"src/config", "src/utils"'
   [[ "$include_llm" == true ]] && packages_array+=', "src/llm"'
-  [[ "$include_logger" == true ]] && packages_array+=', "src/logger"'
-  [[ "$include_serializer" == true ]] && packages_array+=', "src/serializer"'
 
   cat > "pyproject.toml" << PYPROJECT
 [project]
