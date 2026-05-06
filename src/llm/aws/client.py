@@ -11,7 +11,7 @@ from langchain_aws import BedrockEmbeddings, ChatBedrockConverse
 from pydantic import BaseModel, PrivateAttr
 
 # Local packages
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

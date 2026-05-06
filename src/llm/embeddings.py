@@ -7,7 +7,7 @@ using a generic LLM client provider.
 from pydantic import BaseModel, ConfigDict
 
 from llm.protocols import LLMClientProvider
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

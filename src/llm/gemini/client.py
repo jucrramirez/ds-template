@@ -6,7 +6,7 @@ Provides a reusable interface for Google Gemini embeddings and LLM calls.
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from pydantic import BaseModel
 
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,25 +1,26 @@
-"""CSV serializer for Polars DataFrames."""
+"""Parquet serializer for Polars DataFrames."""
 
 from pathlib import Path
 
 import polars as pl
 
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 
 
-class CsvHandler:
-    """Read and write Polars DataFrames as CSV files.
+class ParquetHandler:
+    """Read and write Polars DataFrames as Parquet files.
 
     Example:
-        CsvHandler.save(df, "data/output.csv")
-        df = CsvHandler.load("data/output.csv")
+        handler = ParquetHandler()
+        handler.save(df, "data/output.parquet")
+        df = handler.load("data/output.parquet")
     """
 
     @staticmethod
     def save(data: pl.DataFrame, filepath: str | Path) -> None:
-        """Write a DataFrame to a CSV file.
+        """Write a DataFrame to a Parquet file.
 
         Args:
             data: Polars DataFrame to persist.
@@ -28,20 +29,20 @@ class CsvHandler:
         """
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        data.write_csv(filepath)
+        data.write_parquet(filepath)
         logger.info("Saved %s rows to %s", len(data), filepath.name)
 
     @staticmethod
     def load(filepath: str | Path) -> pl.DataFrame:
-        """Read a CSV file into a DataFrame.
+        """Read a Parquet file into a DataFrame.
 
         Args:
-            filepath: Path to the ``.csv`` file.
+            filepath: Path to the ``.parquet`` file.
 
         Returns:
             Polars DataFrame.
         """
-        df = pl.read_csv(filepath)
+        df = pl.read_parquet(filepath)
         logger.info(
             "Loaded %s rows from %s",
             len(df),

@@ -6,7 +6,7 @@ Provides a reusable interface for Ollama embeddings and LLM calls.
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from pydantic import BaseModel
 
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 logger = get_logger(__name__)
 

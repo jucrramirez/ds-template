@@ -9,7 +9,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 from config.loader import Config, get_storage_path, load_config
-from logger.config import get_logger
+from utils.logger.config import get_logger
 
 _logger = get_logger(__name__)
 
