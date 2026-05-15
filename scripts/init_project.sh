@@ -233,7 +233,7 @@ PYPROJECT
   uv venv --python "$python_version"
 
   # Always install core dependencies.
-  local core_deps="pydantic python-dotenv tqdm"
+  local core_deps="pydantic python-dotenv tqdm jupyterlab"
   [[ "$include_llm" == true ]] && core_deps="${core_deps} langchain-core"
   
   info "Adding core dependencies: $core_deps"
